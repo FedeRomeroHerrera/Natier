@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Jeopardy Game</title>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+  <!-- Pantalla de configuración -->
+  <div id="setup-screen" class="screen active">
+    <div class="setup-container">
+      <h1>Configurar Jeopardy</h1>
+
+      <!-- Equipos -->
+      <section class="setup-section">
+        <div class="section-header">
+          <h2>👥 Configuración de Equipos</h2>
+          <p class="section-description">Cantidad y nombres de equipos</p>
+        </div>
+        <div class="team-setup">
+          <label for="team-count">Número de equipos:</label>
+          <select id="team-count">
+            <option value="2" selected>2 equipos</option>
+            <option value="3">3 equipos</option>
+            <option value="4">4 equipos</option>
+            <option value="5">5 equipos</option>
+            <option value="6">6 equipos</option>
+            <option value="7">7 equipos</option>
+            <option value="8">8 equipos</option>
+            <option value="9">9 equipos</option>
+            <option value="10">10 equipos</option>
+          </select>
+        </div>
+        <div id="team-names" class="input-grid"></div>
+      </section>
+
+      <!-- Categorías -->
+      <section class="setup-section">
+        <div class="section-header">
+          <h2>📁 Configuración de Categorías</h2>
+          <p class="section-description">Elegí cuántas categorías y sus nombres</p>
+        </div>
+        <div class="categories-setup">
+          <label for="categories-count">Número de categorías:</label>
+          <select id="categories-count">
+            <option value="3">3 categorías</option>
+            <option value="4">4 categorías</option>
+            <option value="5" selected>5 categorías</option>
+            <option value="6">6 categorías</option>
+            <option value="7">7 categorías</option>
+            <option value="8">8 categorías</option>
+            <option value="9">9 categorías</option>
+            <option value="10">10 categorías</option>
+          </select>
+        </div>
+        <div id="categories-inputs" class="input-grid"></div>
+      </section>
+
+      <!-- Preguntas -->
+      <section class="setup-section">
+        <div class="section-header">
+          <h2>❓ Configuración de Preguntas</h2>
+          <p class="section-description">Preguntas, respuestas y medios por categoría</p>
+        </div>
+
+        <div class="questions-navigation">
+          <div id="category-tabs" class="category-tabs"></div>
+        </div>
+
+        <div class="questions-setup">
+          <div id="questions-container"></div>
+        </div>
+      </section>
+
+      <!-- Guardado / Carga -->
+      <section class="setup-section">
+        <div class="section-header">
+          <h2>💾Exportar/Importar</h2>
+          
+        </div>
+        <div class="actions-row">
+          
+          <button id="export-json" class="btn-secondary">Exportar Juego</button>
+          <label class="btn-secondary file-button">
+            Importar Juego
+            <input id="import-json" type="file" accept="application/json" hidden>
+          </label>
+        </div>
+      </section>
+
+      <button id="start-game" class="btn-primary">Iniciar Juego</button>
+    </div>
+  </div>
+
+  <!-- Pantalla de juego -->
+  <div id="game-screen" class="screen">
+   <header class="game-header">
+  <div class="logo-title">
+    <img src="Logo_Natier.png" alt="Logo de la empresa" class="game-logo">
+    <h1>Jeopardy</h1>
+  </div>
+  <div id="scoreboard" class="scoreboard"></div>
+</header>
+
+
+    <main id="game-board" class="game-board">
+      <div id="categories-header" class="categories-header"></div>
+      <div id="questions-grid" class="questions-grid"></div>
+    </main>
+  </div>
+
+  <!-- Modal de pregunta -->
+  <div id="question-modal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+
+      <div class="modal-header">
+        <h2 id="modal-category"></h2>
+        <div class="points" id="modal-points"></div>
+      </div>
+
+      <div class="modal-body">
+        <div id="question-content">
+          <p id="question-text"></p>
+          <div id="question-media-container" class="hidden">
+            <!-- dinámico: img / audio / video -->
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <div class="team-buttons" id="team-buttons"></div>
+          <div class="action-buttons">
+            <button id="show-answer" class="btn-secondary">Mostrar Respuesta</button>
+            <button id="close-question" class="btn-primary">Cerrar Pregunta</button>
+          </div>
+        </div>
+
+        <div id="answer-section" class="hidden">
+          <h3>Respuesta:</h3>
+          <p id="answer-text"></p>
+          <div id="answer-media-container" class="hidden">
+            <!-- dinámico: img / audio / video -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
