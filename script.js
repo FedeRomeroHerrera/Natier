@@ -88,6 +88,9 @@ class JeopardyGame {
     container.innerHTML = '';
     tabsContainer.innerHTML = '';
 
+    // Determina si estamos en la carga inicial (cuando this.questions está completamente vacío)
+    const isInitialLoad = Object.keys(this.questions).length === 0;
+
     for (let c = 0; c < this.categoriesCount; c++) {
       const tab = document.createElement('button');
       tab.className = 'category-tab';
@@ -101,10 +104,18 @@ class JeopardyGame {
       catDiv.innerHTML = `<h3>Categoría ${c + 1}</h3>`;
 
       if (!this.questions[c]) this.questions[c] = {};
-      const existingCount = Object.keys(this.questions[c]).length || 5;
-
+      
+      // Se mantiene la lógica de conteo dinámico para las preguntas
+      let existingCount = Object.keys(this.questions[c]).length;
+      
+      if (isInitialLoad && existingCount === 0) {
+        existingCount = 5;
+      }
+      
       for (let qIdx = 0; qIdx < existingCount; qIdx++) {
-        this.addQuestionItem(catDiv, c, qIdx);
+        // MODIFICACIÓN 1: Obtener la data de la pregunta y pasarla
+        const questionData = this.questions[c][qIdx] || {};
+        this.addQuestionItem(catDiv, c, qIdx, questionData);
       }
 
       const addBtn = document.createElement('button');
@@ -128,32 +139,34 @@ class JeopardyGame {
     }
   }
 
-  addQuestionItem(container, category, index) {
+  // MODIFICACIÓN 2: Recibir questionData y usarla para rellenar los inputs
+  addQuestionItem(container, category, index, questionData = {}) {
+    // Usar la data importada, o valores por defecto
+    const qText = questionData.question || '';
+    const aText = questionData.answer || '';
+    const points = questionData.points || (index + 1) * 100;
+    const hasQMedia = questionData.qMediaSrc ? ' (Media cargada)' : '';
+    const hasAMedia = questionData.aMediaSrc ? ' (Media cargada)' : '';
+
     const item = document.createElement('div');
     item.className = 'question-item';
-    
-    const existingData = this.questions[category]?.[index];
-    const points = existingData?.points || (index + 1) * 100;
-    const question = existingData?.question || '';
-    const answer = existingData?.answer || '';
-    
     item.innerHTML = `
       <div class="question-header">
         <label>Puntos:</label>
         <input type="number" value="${points}" class="points-input" data-category="${category}" data-question="${index}">
       </div>
 
-      <textarea placeholder="Pregunta..." class="question-input" data-category="${category}" data-question="${index}">${question}</textarea>
+      <textarea placeholder="Pregunta..." class="question-input" data-category="${category}" data-question="${index}">${qText}</textarea>
 
       <label class="file-input-label">
-        📎 Agregar imagen/audio/video a la pregunta
+        📎 Agregar imagen/audio/video a la pregunta${hasQMedia}
         <input type="file" accept="image/*,audio/*,video/*" class="file-input question-media" data-category="${category}" data-question="${index}">
       </label>
 
-      <textarea placeholder="Respuesta..." class="answer-input" data-category="${category}" data-question="${index}">${answer}</textarea>
+      <textarea placeholder="Respuesta..." class="answer-input" data-category="${category}" data-question="${index}">${aText}</textarea>
 
       <label class="file-input-label">
-        📎 Agregar imagen/audio/video a la respuesta
+        📎 Agregar imagen/audio/video a la respuesta${hasAMedia}
         <input type="file" accept="image/*,audio/*,video/*" class="file-input answer-media" data-category="${category}" data-question="${index}">
       </label>
     `;
@@ -188,164 +201,88 @@ class JeopardyGame {
       if (isQuestionSide) {
         this.questions[category][question].qMediaType = type;
         this.questions[category][question].qMediaSrc = dataURL;
+        // Opcional: Actualizar el texto del label para indicar que se cargó el archivo.
+        const label = event.target.closest('label');
+        if (label) label.innerHTML = `📎 Agregar imagen/audio/video a la pregunta (Media cargada)<input type="file" accept="image/*,audio/*,video/*" class="file-input question-media" data-category="${category}" data-question="${question}">`;
       } else {
         this.questions[category][question].aMediaType = type;
         this.questions[category][question].aMediaSrc = dataURL;
+        // Opcional: Actualizar el texto del label para indicar que se cargó el archivo.
+        const label = event.target.closest('label');
+        if (label) label.innerHTML = `📎 Agregar imagen/audio/video a la respuesta (Media cargada)<input type="file" accept="image/*,audio/*,video/*" class="file-input answer-media" data-category="${category}" data-question="${question}">`;
       }
     };
     reader.readAsDataURL(file);
   }
 
   buildSetupObject() {
-    const data = {};
-
-    // Equipos
-    const teamInputs = document.querySelectorAll('.team-name-input');
-    data.teams = Array.from(teamInputs).map((input, idx) => ({
-      name: input.value.trim() || `Equipo ${idx + 1}`,
-      score: 0
-    }));
-
-    // Categorías
-    const categoryInputs = document.querySelectorAll('.category-input');
-    const categories = Array.from(categoryInputs).map((input, idx) => 
-      input.value.trim() || `Categoría ${idx + 1}`
-    );
-
-    // Preguntas por categoría
-    data.categories = categories.map((catName, cIndex) => {
-      const questionsForCategory = [];
-      
-      // Buscar todos los question-item de esta categoría
-      const categoryQuestions = document.querySelectorAll('.category-questions')[cIndex];
-      if (categoryQuestions) {
-        const items = categoryQuestions.querySelectorAll('.question-item');
-        
-        items.forEach((item) => {
-          const qText = item.querySelector('.question-input')?.value.trim() || '';
-          const aText = item.querySelector('.answer-input')?.value.trim() || '';
-          const points = parseInt(item.querySelector('.points-input')?.value) || 100;
-          
-          const qMediaInput = item.querySelector('.question-media');
-          const aMediaInput = item.querySelector('.answer-media');
-          
-          let qMedia = null;
-          let aMedia = null;
-          
-          // Revisar si hay media guardada en this.questions
-          const catIndex = parseInt(qMediaInput?.dataset.category);
-          const qIndex = parseInt(qMediaInput?.dataset.question);
-          
-          if (!isNaN(catIndex) && !isNaN(qIndex) && this.questions[catIndex]?.[qIndex]) {
-            const stored = this.questions[catIndex][qIndex];
-            if (stored.qMediaSrc) {
-              qMedia = { type: stored.qMediaType, src: stored.qMediaSrc };
-            }
-            if (stored.aMediaSrc) {
-              aMedia = { type: stored.aMediaType, src: stored.aMediaSrc };
-            }
-          }
-          
-          questionsForCategory.push({
-            question: qText,
-            answer: aText,
-            points: points,
-            qMedia: qMedia,
-            aMedia: aMedia
-          });
-        });
-      }
-      
-      return {
-        title: catName,
-        questions: questionsForCategory
-      };
+    const teams = [];
+    document.querySelectorAll('.team-name-input').forEach((input, idx) => {
+      teams.push({ name: input.value.trim() || `Equipo ${idx + 1}`, score: 0 });
     });
+
+    const categories = [];
+    document.querySelectorAll('.category-input').forEach((input, idx) => {
+      categories.push(input.value.trim() || `Categoría ${idx + 1}`);
+    });
+
+    const data = { categoriesCount: this.categoriesCount, teams, categories, questions: {} };
+
+    for (let c = 0; c < this.categoriesCount; c++) {
+      data.questions[c] = {};
+      const questionCount = document.querySelectorAll(`.question-input[data-category="${c}"]`).length;
+
+      for (let q = 0; q < questionCount; q++) {
+        const qEl = document.querySelector(`.question-input[data-category="${c}"][data-question="${q}"]`);
+        const aEl = document.querySelector(`.answer-input[data-category="${c}"][data-question="${q}"]`);
+        const pEl = document.querySelector(`.points-input[data-category="${c}"][data-question="${q}"]`);
+
+        const base = this.questions?.[c]?.[q] || {};
+        data.questions[c][q] = {
+          question: (qEl?.value || '').trim() || 'Pregunta no definida',
+          answer: (aEl?.value || '').trim() || 'Respuesta no definida',
+          points: parseInt(pEl?.value || '100', 10),
+          qMediaType: base.qMediaType || null,
+          qMediaSrc: base.qMediaSrc || null,
+          aMediaType: base.aMediaType || null,
+          aMediaSrc: base.aMediaSrc || null
+        };
+      }
+    }
 
     return data;
   }
 
   applySetupObject(data) {
-    if (!data || !data.categories) {
-      alert("Archivo inválido");
-      return;
-    }
+    // 1. Equipos (MODIFICADO)
+    document.getElementById('team-count').value = String(data.teams.length); // Actualiza el select de cantidad
+    this.updateTeamInputs(data.teams.length); // Crea los inputs vacíos
 
-    // Cargar equipos
-    const teamCount = data.teams?.length || 2;
-    document.getElementById('team-count').value = teamCount;
-    this.updateTeamInputs(teamCount);
-    
-    setTimeout(() => {
-      const teamInputs = document.querySelectorAll('.team-name-input');
-      data.teams?.forEach((team, idx) => {
-        if (teamInputs[idx]) {
-          teamInputs[idx].value = team.name;
-        }
-      });
-    }, 50);
-
-    // Cargar categorías
-    const catCount = data.categories.length;
-    document.getElementById('categories-count').value = catCount;
-    this.categoriesCount = catCount;
-    this.updateCategoriesInputs(catCount);
-    
-    // Convertir formato de preguntas
-    this.questions = {};
-    data.categories.forEach((cat, cIndex) => {
-      this.questions[cIndex] = {};
-      cat.questions?.forEach((q, qIndex) => {
-        this.questions[cIndex][qIndex] = {
-          question: q.question || '',
-          answer: q.answer || '',
-          points: q.points || 100,
-          qMediaType: q.qMedia?.type || null,
-          qMediaSrc: q.qMedia?.src || null,
-          aMediaType: q.aMedia?.type || null,
-          aMediaSrc: q.aMedia?.src || null
-        };
-      });
+    const teamInputs = document.querySelectorAll('.team-name-input');
+    data.teams.forEach((t, i) => {
+      // Ahora rellenamos los inputs recién creados
+      if(teamInputs[i]) teamInputs[i].value = t.name;
     });
+
+    // 2. Categorías y Preguntas
+    this.categoriesCount = data.categoriesCount;
+    document.getElementById('categories-count').value = String(this.categoriesCount);
+    this.updateCategoriesInputs(this.categoriesCount);
     
-    setTimeout(() => {
-      const categoryInputs = document.querySelectorAll('.category-input');
-      data.categories.forEach((cat, idx) => {
-        if (categoryInputs[idx]) {
-          categoryInputs[idx].value = cat.title;
-        }
-      });
-      
-      this.generateQuestionsSetup();
-      
-      // Llenar los campos de preguntas
-      setTimeout(() => {
-        data.categories.forEach((cat, cIndex) => {
-          const categoryContainer = document.querySelectorAll('.category-questions')[cIndex];
-          if (categoryContainer) {
-            const items = categoryContainer.querySelectorAll('.question-item');
-            
-            cat.questions?.forEach((q, qIndex) => {
-              if (items[qIndex]) {
-                const item = items[qIndex];
-                const qInput = item.querySelector('.question-input');
-                const aInput = item.querySelector('.answer-input');
-                const pInput = item.querySelector('.points-input');
-                
-                if (qInput) qInput.value = q.question || '';
-                if (aInput) aInput.value = q.answer || '';
-                if (pInput) pInput.value = q.points || 100;
-              }
-            });
-          }
-        });
-      }, 100);
-    }, 100);
+    // El orden importa: this.questions debe llenarse ANTES de llamar a generateQuestionsSetup()
+    this.questions = data.questions || {}; 
+    this.generateQuestionsSetup();
+
+    const catInputs = document.querySelectorAll('.category-input');
+    data.categories.forEach((cname, i) => {
+      if(catInputs[i]) catInputs[i].value = cname;
+    });
+    this.updateCategoryNames();
   }
 
   exportJSON() {
     const data = this.buildSetupObject();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'jeopardy_setup.json';
@@ -362,8 +299,7 @@ class JeopardyGame {
       try {
         this.applySetupObject(JSON.parse(ev.target.result));
         alert('✅ Juego importado correctamente.');
-      } catch (err) {
-        console.error(err);
+      } catch {
         alert('❌ Archivo inválido.');
       }
     };
@@ -373,8 +309,17 @@ class JeopardyGame {
   startGame() {
     this.teams = [];
     document.querySelectorAll('.team-name-input').forEach((input, idx) => {
-      this.teams.push({ name: input.value.trim() || `Equipo ${idx + 1}`, score: 0 });
+      const name = input.value.trim();
+      if (name) {
+          this.teams.push({ name: name, score: 0 });
+      }
     });
+    
+    // FIX: Verificar que hay equipos para jugar
+    if (this.teams.length === 0) {
+        alert('❌ Debes definir al menos un equipo para empezar el juego.');
+        return;
+    }
 
     this.categories = [];
     document.querySelectorAll('.category-input').forEach((input, idx) => {
@@ -390,43 +335,25 @@ class JeopardyGame {
   }
 
   collectQuestions() {
-    this.questions = {};
+    for (let c = 0; c < this.categoriesCount; c++) {
+      const questionCount = document.querySelectorAll(`.question-input[data-category="${c}"]`).length;
+      for (let q = 0; q < questionCount; q++) {
+        const qEl = document.querySelector(`.question-input[data-category="${c}"][data-question="${q}"]`);
+        const aEl = document.querySelector(`.answer-input[data-category="${c}"][data-question="${q}"]`);
+        const pEl = document.querySelector(`.points-input[data-category="${c}"][data-question="${q}"]`);
 
-    const categoryContainers = document.querySelectorAll('.category-questions');
-
-    categoryContainers.forEach((catContainer, cIndex) => {
-      const questionItems = catContainer.querySelectorAll('.question-item');
-      this.questions[cIndex] = {};
-
-      questionItems.forEach((item, qIndex) => {
-        const qText = item.querySelector('.question-input').value.trim();
-        const aText = item.querySelector('.answer-input').value.trim();
-        const points = parseInt(item.querySelector('.points-input').value) || 100;
-
-        const category = item.querySelector('.question-input').dataset.category;
-        const question = item.querySelector('.question-input').dataset.question;
-
-        // Obtener media guardada
-        let qMediaType = null, qMediaSrc = null;
-        let aMediaType = null, aMediaSrc = null;
-
-        if (this.questions[category]?.[question]) {
-          const stored = this.questions[category][question];
-          qMediaType = stored.qMediaType;
-          qMediaSrc = stored.qMediaSrc;
-          aMediaType = stored.aMediaType;
-          aMediaSrc = stored.aMediaSrc;
-        }
-
-        this.questions[cIndex][qIndex] = {
-          question: qText,
-          answer: aText,
-          points: points,
-          qMedia: qMediaSrc ? { type: qMediaType, src: qMediaSrc } : null,
-          aMedia: aMediaSrc ? { type: aMediaType, src: aMediaSrc } : null
+        const prev = this.questions[c]?.[q] || {};
+        this.questions[c][q] = {
+          question: (qEl?.value || '').trim(),
+          answer: (aEl?.value || '').trim(),
+          points: parseInt(pEl?.value || '100'),
+          qMediaType: prev.qMediaType || null,
+          qMediaSrc: prev.qMediaSrc || null,
+          aMediaType: prev.aMediaType || null,
+          aMediaSrc: prev.aMediaSrc || null
         };
-      });
-    });
+      }
+    }
   }
 
   generateGameInterface() {
@@ -459,7 +386,7 @@ class JeopardyGame {
       categoriesHeader.appendChild(el);
     });
 
-    const maxRows = Math.max(...Object.values(this.questions).map(cat => Object.keys(cat).length));
+    const maxRows = Math.max(5, ...Object.values(this.questions).map(cat => Object.keys(cat).length));
 
     for (let row = 0; row < maxRows; row++) {
       for (let col = 0; col < this.categoriesCount; col++) {
@@ -489,9 +416,9 @@ class JeopardyGame {
     document.getElementById('modal-points').textContent = `${data.points}`;
     document.getElementById('question-text').textContent = data.question;
 
-    this.renderModalMedia('question-media-container', data.qMedia?.type, data.qMedia?.src);
+    this.renderModalMedia('question-media-container', data.qMediaType, data.qMediaSrc);
     document.getElementById('answer-text').textContent = data.answer;
-    this.renderModalMedia('answer-media-container', data.aMedia?.type, data.aMedia?.src);
+    this.renderModalMedia('answer-media-container', data.aMediaType, data.aMediaSrc);
 
     document.getElementById('answer-section').classList.add('hidden');
     document.getElementById('show-answer').style.display = 'inline-block';
@@ -545,11 +472,29 @@ class JeopardyGame {
   }
 
   scoreTeam(teamIndex, isCorrect) {
-    const points = this.currentQuestion.data.points;
+    // 1. Comprobación de seguridad
+    if (!this.currentQuestion || !this.currentQuestion.data) {
+        return; 
+    }
+    
+    // 2. Garantizar que los puntos son un número válido
+    const rawPoints = this.currentQuestion.data.points;
+    const points = parseInt(rawPoints, 10);
+    
+    if (isNaN(points)) {
+        return; 
+    }
+
+    // 3. Asignar puntaje
     if (isCorrect) this.teams[teamIndex].score += points;
     else this.teams[teamIndex].score -= points;
 
+    // 4. Actualizar el marcador
     document.getElementById(`score-${teamIndex}`).textContent = this.teams[teamIndex].score;
+
+    // 5. FIX CRÍTICO: CERRAR AUTOMÁTICAMENTE LA PREGUNTA
+    // Esto previene los clics duplicados, cierra la modal y marca la celda como respondida.
+    this.closeModal(); 
   }
 
   showAnswer() {
