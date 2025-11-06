@@ -191,59 +191,63 @@ class JeopardyGame {
   }
 
   buildSetupObject() {
-    const teams = [];
-    document.querySelectorAll('.team-name-input').forEach((input, idx) => {
-      teams.push({ name: input.value.trim() || `Equipo ${idx + 1}`, score: 0 });
-    });
+  const data = {};
 
-    const categories = [];
-    document.querySelectorAll('.category-input').forEach((input, idx) => {
-      categories.push(input.value.trim() || `Categoría ${idx + 1}`);
-    });
+  // Equipos
+  data.teams = this.teams.map(team => ({
+    name: team.name,
+    score: team.score || 0
+  }));
 
-    const data = { categoriesCount: this.categoriesCount, teams, categories, questions: {} };
+  // Categorías + Preguntas
+  data.categories = this.categories.map((cat, cIndex) => {
+    return {
+      title: cat,
+      questions: this.questions[cIndex].map(q => ({
+        question: q.question,
+        answer: q.answer,
+        points: q.points,
+        media: q.media ? { 
+          type: q.media.type,
+          src: q.media.src 
+        } : null
+      }))
+    };
+  });
 
-    for (let c = 0; c < this.categoriesCount; c++) {
-      data.questions[c] = {};
-      const questionCount = document.querySelectorAll(`.question-input[data-category="${c}"]`).length;
+  return data;
+}
 
-      for (let q = 0; q < questionCount; q++) {
-        const qEl = document.querySelector(`.question-input[data-category="${c}"][data-question="${q}"]`);
-        const aEl = document.querySelector(`.answer-input[data-category="${c}"][data-question="${q}"]`);
-        const pEl = document.querySelector(`.points-input[data-category="${c}"][data-question="${q}"]`);
 
-        const base = this.questions?.[c]?.[q] || {};
-        data.questions[c][q] = {
-          question: (qEl?.value || '').trim() || 'Pregunta no definida',
-          answer: (aEl?.value || '').trim() || 'Respuesta no definida',
-          points: parseInt(pEl?.value || '100', 10),
-          qMediaType: base.qMediaType || null,
-          qMediaSrc: base.qMediaSrc || null,
-          aMediaType: base.aMediaType || null,
-          aMediaSrc: base.aMediaSrc || null
-        };
-      }
-    }
+applySetupObject(data) {
 
-    return data;
-  }
+  // Equipos
+  this.teams = data.teams.map(t => ({
+    name: t.name,
+    score: t.score || 0
+  }));
 
-  applySetupObject(data) {
-    this.categoriesCount = data.categoriesCount;
-    document.getElementById('categories-count').value = String(this.categoriesCount);
-    this.updateCategoriesInputs(this.categoriesCount);
-    this.questions = data.questions || {};
-    this.generateQuestionsSetup();
+  // Categorías + Preguntas
+  this.categories = data.categories.map(c => c.title);
 
-    const teamInputs = document.querySelectorAll('.team-name-input');
-    document.getElementById('team-count').value = String(data.teams.length);
-    this.updateTeamInputs(data.teams.length);
-    data.teams.forEach((t, i) => teamInputs[i].value = t.name);
+  this.questions = data.categories.map(cat =>
+    cat.questions.map(q => ({
+      question: q.question || "",
+      answer: q.answer || "",
+      points: q.points || 100,
+      media: q.media && q.media.src ? { 
+        type: q.media.type, 
+        src: q.media.src 
+      } : null
+    }))
+  );
 
-    const catInputs = document.querySelectorAll('.category-input');
-    data.categories.forEach((cname, i) => catInputs[i].value = cname);
-    this.updateCategoryNames();
-  }
+  // Refrescar UI
+  this.generateTeamInputs();
+  this.generateCategoriesInputs();
+  this.generateQuestionsSetup();
+}
+
 
   exportJSON() {
     const data = this.buildSetupObject();
