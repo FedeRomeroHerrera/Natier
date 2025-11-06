@@ -131,20 +131,26 @@ class JeopardyGame {
   addQuestionItem(container, category, index) {
     const item = document.createElement('div');
     item.className = 'question-item';
+    
+    const existingData = this.questions[category]?.[index];
+    const points = existingData?.points || (index + 1) * 100;
+    const question = existingData?.question || '';
+    const answer = existingData?.answer || '';
+    
     item.innerHTML = `
       <div class="question-header">
         <label>Puntos:</label>
-        <input type="number" value="${(index+1)*100}" class="points-input" data-category="${category}" data-question="${index}">
+        <input type="number" value="${points}" class="points-input" data-category="${category}" data-question="${index}">
       </div>
 
-      <textarea placeholder="Pregunta..." class="question-input" data-category="${category}" data-question="${index}"></textarea>
+      <textarea placeholder="Pregunta..." class="question-input" data-category="${category}" data-question="${index}">${question}</textarea>
 
       <label class="file-input-label">
         📎 Agregar imagen/audio/video a la pregunta
         <input type="file" accept="image/*,audio/*,video/*" class="file-input question-media" data-category="${category}" data-question="${index}">
       </label>
 
-      <textarea placeholder="Respuesta..." class="answer-input" data-category="${category}" data-question="${index}"></textarea>
+      <textarea placeholder="Respuesta..." class="answer-input" data-category="${category}" data-question="${index}">${answer}</textarea>
 
       <label class="file-input-label">
         📎 Agregar imagen/audio/video a la respuesta
@@ -191,100 +197,155 @@ class JeopardyGame {
   }
 
   buildSetupObject() {
-  const data = {};
+    const data = {};
 
-  // Equipos
-  data.teams = this.teams.map(team => ({
-    name: team.name,
-    score: team.score || 0
-  }));
-
-  // Categorías + Preguntas
-  data.categories = this.categories.map((cat, cIndex) => {
-    return {
-      title: cat,
-      questions: this.questions[cIndex].map(q => ({
-        question: q.question,
-        answer: q.answer,
-        points: q.points,
-        media: q.media ? { 
-          type: q.media.type,
-          src: q.media.src 
-        } : null
-      }))
-    };
-  });
-
-  return data;
-}
-
-
-applySetupObject(data) {
-  // Si el archivo es formato nuevo → (categorías con {title, questions})
-  if (Array.isArray(data.categories) && data.categories[0]?.questions) {
-    this.teams = (data.teams || []).map(t => ({
-      name: t.name,
-      score: t.score || 0
+    // Equipos
+    const teamInputs = document.querySelectorAll('.team-name-input');
+    data.teams = Array.from(teamInputs).map((input, idx) => ({
+      name: input.value.trim() || `Equipo ${idx + 1}`,
+      score: 0
     }));
 
-    this.categories = data.categories.map(c => c.title);
-
-    this.questions = data.categories.map(cat =>
-      cat.questions.map(q => ({
-        question: q.question || "",
-        answer: q.answer || "",
-        points: q.points || 100,
-        media: q.media && q.media.src ? {
-          type: q.media.type,
-          src: q.media.src
-        } : null
-      }))
+    // Categorías
+    const categoryInputs = document.querySelectorAll('.category-input');
+    const categories = Array.from(categoryInputs).map((input, idx) => 
+      input.value.trim() || `Categoría ${idx + 1}`
     );
 
-    this.generateTeamInputs();
-    this.generateCategoriesInputs();
-    this.generateQuestionsSetup();
-    return;
+    // Preguntas por categoría
+    data.categories = categories.map((catName, cIndex) => {
+      const questionsForCategory = [];
+      
+      // Buscar todos los question-item de esta categoría
+      const categoryQuestions = document.querySelectorAll('.category-questions')[cIndex];
+      if (categoryQuestions) {
+        const items = categoryQuestions.querySelectorAll('.question-item');
+        
+        items.forEach((item) => {
+          const qText = item.querySelector('.question-input')?.value.trim() || '';
+          const aText = item.querySelector('.answer-input')?.value.trim() || '';
+          const points = parseInt(item.querySelector('.points-input')?.value) || 100;
+          
+          const qMediaInput = item.querySelector('.question-media');
+          const aMediaInput = item.querySelector('.answer-media');
+          
+          let qMedia = null;
+          let aMedia = null;
+          
+          // Revisar si hay media guardada en this.questions
+          const catIndex = parseInt(qMediaInput?.dataset.category);
+          const qIndex = parseInt(qMediaInput?.dataset.question);
+          
+          if (!isNaN(catIndex) && !isNaN(qIndex) && this.questions[catIndex]?.[qIndex]) {
+            const stored = this.questions[catIndex][qIndex];
+            if (stored.qMediaSrc) {
+              qMedia = { type: stored.qMediaType, src: stored.qMediaSrc };
+            }
+            if (stored.aMediaSrc) {
+              aMedia = { type: stored.aMediaType, src: stored.aMediaSrc };
+            }
+          }
+          
+          questionsForCategory.push({
+            question: qText,
+            answer: aText,
+            points: points,
+            qMedia: qMedia,
+            aMedia: aMedia
+          });
+        });
+      }
+      
+      return {
+        title: catName,
+        questions: questionsForCategory
+      };
+    });
+
+    return data;
   }
 
-  // Si es JSON viejo → convertimos al vuelo automáticamente
-  if (data.categories && data.questions) {
-    this.teams = data.teams || [];
+  applySetupObject(data) {
+    if (!data || !data.categories) {
+      alert("Archivo inválido");
+      return;
+    }
 
-    this.categories = data.categories;
+    // Cargar equipos
+    const teamCount = data.teams?.length || 2;
+    document.getElementById('team-count').value = teamCount;
+    this.updateTeamInputs(teamCount);
+    
+    setTimeout(() => {
+      const teamInputs = document.querySelectorAll('.team-name-input');
+      data.teams?.forEach((team, idx) => {
+        if (teamInputs[idx]) {
+          teamInputs[idx].value = team.name;
+        }
+      });
+    }, 50);
 
-    this.questions = Object.keys(data.questions).map(c =>
-      Object.keys(data.questions[c]).map(q => {
-        const old = data.questions[c][q];
-        return {
-          question: old.question,
-          answer: old.answer,
-          points: old.points || 100,
-          media: old.qMediaSrc ? { type: old.qMediaType, src: old.qMediaSrc } : null
+    // Cargar categorías
+    const catCount = data.categories.length;
+    document.getElementById('categories-count').value = catCount;
+    this.categoriesCount = catCount;
+    this.updateCategoriesInputs(catCount);
+    
+    // Convertir formato de preguntas
+    this.questions = {};
+    data.categories.forEach((cat, cIndex) => {
+      this.questions[cIndex] = {};
+      cat.questions?.forEach((q, qIndex) => {
+        this.questions[cIndex][qIndex] = {
+          question: q.question || '',
+          answer: q.answer || '',
+          points: q.points || 100,
+          qMediaType: q.qMedia?.type || null,
+          qMediaSrc: q.qMedia?.src || null,
+          aMediaType: q.aMedia?.type || null,
+          aMediaSrc: q.aMedia?.src || null
         };
-      })
-    );
-
-    this.generateTeamInputs();
-    this.generateCategoriesInputs();
-    this.generateQuestionsSetup();
-    return;
+      });
+    });
+    
+    setTimeout(() => {
+      const categoryInputs = document.querySelectorAll('.category-input');
+      data.categories.forEach((cat, idx) => {
+        if (categoryInputs[idx]) {
+          categoryInputs[idx].value = cat.title;
+        }
+      });
+      
+      this.generateQuestionsSetup();
+      
+      // Llenar los campos de preguntas
+      setTimeout(() => {
+        data.categories.forEach((cat, cIndex) => {
+          const categoryContainer = document.querySelectorAll('.category-questions')[cIndex];
+          if (categoryContainer) {
+            const items = categoryContainer.querySelectorAll('.question-item');
+            
+            cat.questions?.forEach((q, qIndex) => {
+              if (items[qIndex]) {
+                const item = items[qIndex];
+                const qInput = item.querySelector('.question-input');
+                const aInput = item.querySelector('.answer-input');
+                const pInput = item.querySelector('.points-input');
+                
+                if (qInput) qInput.value = q.question || '';
+                if (aInput) aInput.value = q.answer || '';
+                if (pInput) pInput.value = q.points || 100;
+              }
+            });
+          }
+        });
+      }, 100);
+    }, 100);
   }
-
-  alert("Archivo inválido");
-
-
-
-  // Refrescar UI
-  this.generateTeamInputs();
-  this.generateCategoriesInputs();
-  this.generateQuestionsSetup();
-}
-
 
   exportJSON() {
     const data = this.buildSetupObject();
-    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'jeopardy_setup.json';
@@ -301,7 +362,8 @@ applySetupObject(data) {
       try {
         this.applySetupObject(JSON.parse(ev.target.result));
         alert('✅ Juego importado correctamente.');
-      } catch {
+      } catch (err) {
+        console.error(err);
         alert('❌ Archivo inválido.');
       }
     };
@@ -327,43 +389,45 @@ applySetupObject(data) {
     this.generateGameInterface();
   }
 
- collectQuestions() {
-  this.questions = [];
+  collectQuestions() {
+    this.questions = {};
 
-  const categoryContainers = document.querySelectorAll('.questions-category');
+    const categoryContainers = document.querySelectorAll('.category-questions');
 
-  categoryContainers.forEach((catContainer, cIndex) => {
-    const questionItems = catContainer.querySelectorAll('.question-item');
-    const categoryQuestions = [];
+    categoryContainers.forEach((catContainer, cIndex) => {
+      const questionItems = catContainer.querySelectorAll('.question-item');
+      this.questions[cIndex] = {};
 
-    questionItems.forEach((item) => {
-      const qText = item.querySelector('.question-input').value.trim();
-      const aText = item.querySelector('.answer-input').value.trim();
-      const points = parseInt(item.querySelector('.points-input').value) || 100;
+      questionItems.forEach((item, qIndex) => {
+        const qText = item.querySelector('.question-input').value.trim();
+        const aText = item.querySelector('.answer-input').value.trim();
+        const points = parseInt(item.querySelector('.points-input').value) || 100;
 
-      // Buscar media (pregunta y respuesta)
-      let media = null;
-      const qMediaEl = item.querySelector('.question-media');
-      const aMediaEl = item.querySelector('.answer-media');
+        const category = item.querySelector('.question-input').dataset.category;
+        const question = item.querySelector('.question-input').dataset.question;
 
-      if (qMediaEl && qMediaEl.dataset.src) {
-        media = { type: qMediaEl.dataset.type, src: qMediaEl.dataset.src };
-      } else if (aMediaEl && aMediaEl.dataset.src) {
-        media = { type: aMediaEl.dataset.type, src: aMediaEl.dataset.src };
-      }
+        // Obtener media guardada
+        let qMediaType = null, qMediaSrc = null;
+        let aMediaType = null, aMediaSrc = null;
 
-      categoryQuestions.push({
-        question: qText,
-        answer: aText,
-        points: points,
-        media: media
+        if (this.questions[category]?.[question]) {
+          const stored = this.questions[category][question];
+          qMediaType = stored.qMediaType;
+          qMediaSrc = stored.qMediaSrc;
+          aMediaType = stored.aMediaType;
+          aMediaSrc = stored.aMediaSrc;
+        }
+
+        this.questions[cIndex][qIndex] = {
+          question: qText,
+          answer: aText,
+          points: points,
+          qMedia: qMediaSrc ? { type: qMediaType, src: qMediaSrc } : null,
+          aMedia: aMediaSrc ? { type: aMediaType, src: aMediaSrc } : null
+        };
       });
     });
-
-    this.questions.push(categoryQuestions);
-  });
-}
-
+  }
 
   generateGameInterface() {
     const scoreboard = document.getElementById('scoreboard');
@@ -425,9 +489,9 @@ applySetupObject(data) {
     document.getElementById('modal-points').textContent = `${data.points}`;
     document.getElementById('question-text').textContent = data.question;
 
-    this.renderModalMedia('question-media-container', data.qMediaType, data.qMediaSrc);
+    this.renderModalMedia('question-media-container', data.qMedia?.type, data.qMedia?.src);
     document.getElementById('answer-text').textContent = data.answer;
-    this.renderModalMedia('answer-media-container', data.aMediaType, data.aMediaSrc);
+    this.renderModalMedia('answer-media-container', data.aMedia?.type, data.aMedia?.src);
 
     document.getElementById('answer-section').classList.add('hidden');
     document.getElementById('show-answer').style.display = 'inline-block';
