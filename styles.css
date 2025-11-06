@@ -182,7 +182,27 @@ textarea { min-height: 70px; resize: vertical; }
 .game-logo {
   width: 90px;
   height: auto;
-  filter: drop-shadow(0 0 8px rgba(0, 234, 255, 0.7));
+  filter: drop-shadow(0 0 8px rgba(252, 248, 1, 0.7));
   transition: transform 0.3s ease, filter 0.3s ease;
 }
+
+/* Tamaño máximo de imágenes dentro del modal */
+.modal-media {
+  max-width: 60vw;
+  max-height: 60vh;
+  object-fit: contain;
+}
+
+/* Ajustar tamaño miniatura en el setup */
+.file-preview {
+  max-width: 120px !important;
+  max-height: 90px !important;
+  object-fit: cover;
+}
+
+
+
+
+
+
 
