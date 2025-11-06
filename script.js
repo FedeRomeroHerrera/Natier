@@ -220,27 +220,60 @@ class JeopardyGame {
 
 
 applySetupObject(data) {
+  // Si el archivo es formato nuevo → (categorías con {title, questions})
+  if (Array.isArray(data.categories) && data.categories[0]?.questions) {
+    this.teams = (data.teams || []).map(t => ({
+      name: t.name,
+      score: t.score || 0
+    }));
 
-  // Equipos
-  this.teams = data.teams.map(t => ({
-    name: t.name,
-    score: t.score || 0
-  }));
+    this.categories = data.categories.map(c => c.title);
 
-  // Categorías + Preguntas
-  this.categories = data.categories.map(c => c.title);
+    this.questions = data.categories.map(cat =>
+      cat.questions.map(q => ({
+        question: q.question || "",
+        answer: q.answer || "",
+        points: q.points || 100,
+        media: q.media && q.media.src ? {
+          type: q.media.type,
+          src: q.media.src
+        } : null
+      }))
+    );
 
-  this.questions = data.categories.map(cat =>
-    cat.questions.map(q => ({
-      question: q.question || "",
-      answer: q.answer || "",
-      points: q.points || 100,
-      media: q.media && q.media.src ? { 
-        type: q.media.type, 
-        src: q.media.src 
-      } : null
-    }))
-  );
+    this.generateTeamInputs();
+    this.generateCategoriesInputs();
+    this.generateQuestionsSetup();
+    return;
+  }
+
+  // Si es JSON viejo → convertimos al vuelo automáticamente
+  if (data.categories && data.questions) {
+    this.teams = data.teams || [];
+
+    this.categories = data.categories;
+
+    this.questions = Object.keys(data.questions).map(c =>
+      Object.keys(data.questions[c]).map(q => {
+        const old = data.questions[c][q];
+        return {
+          question: old.question,
+          answer: old.answer,
+          points: old.points || 100,
+          media: old.qMediaSrc ? { type: old.qMediaType, src: old.qMediaSrc } : null
+        };
+      })
+    );
+
+    this.generateTeamInputs();
+    this.generateCategoriesInputs();
+    this.generateQuestionsSetup();
+    return;
+  }
+
+  alert("Archivo inválido");
+
+
 
   // Refrescar UI
   this.generateTeamInputs();
