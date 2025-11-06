@@ -294,27 +294,43 @@ applySetupObject(data) {
     this.generateGameInterface();
   }
 
-  collectQuestions() {
-    for (let c = 0; c < this.categoriesCount; c++) {
-      const questionCount = document.querySelectorAll(`.question-input[data-category="${c}"]`).length;
-      for (let q = 0; q < questionCount; q++) {
-        const qEl = document.querySelector(`.question-input[data-category="${c}"][data-question="${q}"]`);
-        const aEl = document.querySelector(`.answer-input[data-category="${c}"][data-question="${q}"]`);
-        const pEl = document.querySelector(`.points-input[data-category="${c}"][data-question="${q}"]`);
+ collectQuestions() {
+  this.questions = [];
 
-        const prev = this.questions[c][q] || {};
-        this.questions[c][q] = {
-          question: (qEl?.value || '').trim(),
-          answer: (aEl?.value || '').trim(),
-          points: parseInt(pEl?.value || '100'),
-          qMediaType: prev.qMediaType || null,
-          qMediaSrc: prev.qMediaSrc || null,
-          aMediaType: prev.aMediaType || null,
-          aMediaSrc: prev.aMediaSrc || null
-        };
+  const categoryContainers = document.querySelectorAll('.questions-category');
+
+  categoryContainers.forEach((catContainer, cIndex) => {
+    const questionItems = catContainer.querySelectorAll('.question-item');
+    const categoryQuestions = [];
+
+    questionItems.forEach((item) => {
+      const qText = item.querySelector('.question-input').value.trim();
+      const aText = item.querySelector('.answer-input').value.trim();
+      const points = parseInt(item.querySelector('.points-input').value) || 100;
+
+      // Buscar media (pregunta y respuesta)
+      let media = null;
+      const qMediaEl = item.querySelector('.question-media');
+      const aMediaEl = item.querySelector('.answer-media');
+
+      if (qMediaEl && qMediaEl.dataset.src) {
+        media = { type: qMediaEl.dataset.type, src: qMediaEl.dataset.src };
+      } else if (aMediaEl && aMediaEl.dataset.src) {
+        media = { type: aMediaEl.dataset.type, src: aMediaEl.dataset.src };
       }
-    }
-  }
+
+      categoryQuestions.push({
+        question: qText,
+        answer: aText,
+        points: points,
+        media: media
+      });
+    });
+
+    this.questions.push(categoryQuestions);
+  });
+}
+
 
   generateGameInterface() {
     const scoreboard = document.getElementById('scoreboard');
