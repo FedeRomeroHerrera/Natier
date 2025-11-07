@@ -151,57 +151,63 @@ textarea { min-height: 70px; resize: vertical; }
 
 .hidden { display: none; }
 
-/* Medios en el modal */
-.modal-media { display: block; margin: 10px auto; max-width: 50vw; max-height: 50vw; border-radius: 8px; }
-.modal-media.video { background: #000; }
+/* ==================== */
+/*  MEDIOS EN EL MODAL  */
+/*  (VERSIÓN LIMPIA)    */
+/* ==================== */
 
-/* Imagen ampliable en el modal */
-.modal-media.zoomable {
-  cursor: zoom-in;
-  transition: transform 0.3s ease;
-}
-
-.modal-media.zoomed {
-  cursor: zoom-out;
-  transform: scale(1.9);
-  z-index: 9999;
-  position: relative;
-}
-
-/* Contenedor de puntajes y logo */
-.score-logo-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-  flex-wrap: wrap;
-  margin-top: 10px;
-}
-
-/* Estilo del logo */
-.game-logo {
-  width: 90px;
-  height: auto;
-  filter: drop-shadow(0 0 8px rgba(0, 234, 255, 0.7));
-  transition: transform 0.3s ease, filter 0.3s ease;
-}
-
-/* Tamaño máximo de imágenes dentro del modal */
+/* Estado normal de la imagen dentro del modal */
 .modal-media {
+  display: block;
+  margin: 12px auto;
   max-width: 60vw;
   max-height: 60vh;
   object-fit: contain;
-}
-
-/* Ajustar tamaño miniatura en el setup */
-.file-preview {
-  max-width: 120px !important;
-  max-height: 90px !important;
-  object-fit: cover;
+  border-radius: 8px;
+  cursor: zoom-in;
+  transition: none; /* SIN animación */
 }
 
 
+/* Estado ZOOM (pantalla centrada a 85% del viewport) */
+.modal-media.zoomed {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 95vw !important;
+  height: 95vh !important;
+  max-width: 95vw !important;
+  max-height: 95vh !important;
+  transform: translate(-50%, -50%);
+  object-fit: contain;
+  /*background: rgba(0,0,0,0.92);*/
+  border-radius: 0;
+  cursor: zoom-out;
+  padding: 0;
+  margin: 0;
+  z-index: 99999;
+}
 
+/* Bloquear scroll de fondo cuando hay zoom */
+body.zoom-active {
+  overflow: hidden;
+}
+
+/* Videos: sin zoom, solo se muestran normales */
+.modal-media-video {
+  display: block;
+  margin: 12px auto;
+  max-width: 60vw;
+  max-height: 60vh;
+  object-fit: contain;
+  background: #000;
+}
+
+/* El modal debe permitir scroll interno cuando el contenido crece */
+.modal-content {
+  max-height: 90vh;
+  overflow-y: auto;
+}
 
 
 

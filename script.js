@@ -427,30 +427,43 @@ class JeopardyGame {
     document.getElementById('question-modal').style.display = 'block';
   }
 
-  renderModalMedia(containerId, type, src) {
-    const cont = document.getElementById(containerId);
-    cont.innerHTML = '';
-    if (!type || !src) return cont.classList.add('hidden');
+ renderModalMedia(containerId, type, src) {
+  const cont = document.getElementById(containerId);
+  cont.innerHTML = '';
 
-    let el;
-    if (type === 'image') {
-      el = document.createElement('img');
-      el.src = src;
-      el.className = 'modal-media zoomable';
-      el.addEventListener('click', () => el.classList.toggle('zoomed'));
-    } else if (type === 'audio') {
-      el = document.createElement('audio');
-      el.src = src;
-      el.controls = true;
-    } else if (type === 'video') {
-      el = document.createElement('video');
-      el.src = src;
-      el.controls = true;
-    }
-
-    cont.appendChild(el);
-    cont.classList.remove('hidden');
+  if (!type || !src) {
+    cont.classList.add('hidden');
+    return;
   }
+
+  let el;
+  if (type === 'image') {
+    el = document.createElement('img');
+    el.src = src;
+    el.className = 'modal-media';
+
+    // Zoom toggle estable
+    el.addEventListener('click', () => {
+      el.classList.toggle('zoomed');
+      document.body.classList.toggle('zoom-active');
+    });
+
+  } else if (type === 'audio') {
+    el = document.createElement('audio');
+    el.src = src;
+    el.controls = true;
+
+  } else if (type === 'video') {
+    el = document.createElement('video');
+    el.src = src;
+    el.controls = true;
+    el.className = 'modal-media-video';
+  }
+
+  cont.appendChild(el);
+  cont.classList.remove('hidden');
+}
+
 
   generateTeamButtons() {
     const container = document.getElementById('team-buttons');
