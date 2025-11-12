@@ -211,4 +211,12 @@ body.zoom-active {
 
 
 
+/* ===== TIMER Y EFECTO FLASH ===== */
+#question-timer {
+  text-shadow: 0 0 8px rgba(255,255,255,0.8), 0 0 16px rgba(255,255,255,0.6);
+}
 
+body.flash {
+  background-color: #ff0000 !important;
+  transition: background-color 0.3s ease;
+}

@@ -7,6 +7,10 @@ class JeopardyGame {
     this.answeredQuestions = new Set();
     this.currentQuestion = null;
 
+    // Timer
+    this.timerInterval = null;
+    this.timeLeft = 0;
+
     this.init();
   }
 
@@ -113,7 +117,7 @@ class JeopardyGame {
       }
       
       for (let qIdx = 0; qIdx < existingCount; qIdx++) {
-        // MODIFICACIÓN 1: Obtener la data de la pregunta y pasarla
+        // Obtener la data de la pregunta y pasarla
         const questionData = this.questions[c][qIdx] || {};
         this.addQuestionItem(catDiv, c, qIdx, questionData);
       }
@@ -139,9 +143,7 @@ class JeopardyGame {
     }
   }
 
-  // MODIFICACIÓN 2: Recibir questionData y usarla para rellenar los inputs
   addQuestionItem(container, category, index, questionData = {}) {
-    // Usar la data importada, o valores por defecto
     const qText = questionData.question || '';
     const aText = questionData.answer || '';
     const points = questionData.points || (index + 1) * 100;
@@ -201,13 +203,11 @@ class JeopardyGame {
       if (isQuestionSide) {
         this.questions[category][question].qMediaType = type;
         this.questions[category][question].qMediaSrc = dataURL;
-        // Opcional: Actualizar el texto del label para indicar que se cargó el archivo.
         const label = event.target.closest('label');
         if (label) label.innerHTML = `📎 Agregar imagen/audio/video a la pregunta (Media cargada)<input type="file" accept="image/*,audio/*,video/*" class="file-input question-media" data-category="${category}" data-question="${question}">`;
       } else {
         this.questions[category][question].aMediaType = type;
         this.questions[category][question].aMediaSrc = dataURL;
-        // Opcional: Actualizar el texto del label para indicar que se cargó el archivo.
         const label = event.target.closest('label');
         if (label) label.innerHTML = `📎 Agregar imagen/audio/video a la respuesta (Media cargada)<input type="file" accept="image/*,audio/*,video/*" class="file-input answer-media" data-category="${category}" data-question="${question}">`;
       }
@@ -260,7 +260,6 @@ class JeopardyGame {
 
     const teamInputs = document.querySelectorAll('.team-name-input');
     data.teams.forEach((t, i) => {
-      // Ahora rellenamos los inputs recién creados
       if(teamInputs[i]) teamInputs[i].value = t.name;
     });
 
@@ -425,45 +424,47 @@ class JeopardyGame {
 
     this.generateTeamButtons();
     document.getElementById('question-modal').style.display = 'block';
+
+    // Iniciar timer cuando se abre la pregunta
+    this.startTimer();
   }
 
- renderModalMedia(containerId, type, src) {
-  const cont = document.getElementById(containerId);
-  cont.innerHTML = '';
+  renderModalMedia(containerId, type, src) {
+    const cont = document.getElementById(containerId);
+    cont.innerHTML = '';
 
-  if (!type || !src) {
-    cont.classList.add('hidden');
-    return;
+    if (!type || !src) {
+      cont.classList.add('hidden');
+      return;
+    }
+
+    let el;
+    if (type === 'image') {
+      el = document.createElement('img');
+      el.src = src;
+      el.className = 'modal-media';
+
+      // Zoom toggle estable
+      el.addEventListener('click', () => {
+        el.classList.toggle('zoomed');
+        document.body.classList.toggle('zoom-active');
+      });
+
+    } else if (type === 'audio') {
+      el = document.createElement('audio');
+      el.src = src;
+      el.controls = true;
+
+    } else if (type === 'video') {
+      el = document.createElement('video');
+      el.src = src;
+      el.controls = true;
+      el.className = 'modal-media-video';
+    }
+
+    cont.appendChild(el);
+    cont.classList.remove('hidden');
   }
-
-  let el;
-  if (type === 'image') {
-    el = document.createElement('img');
-    el.src = src;
-    el.className = 'modal-media';
-
-    // Zoom toggle estable
-    el.addEventListener('click', () => {
-      el.classList.toggle('zoomed');
-      document.body.classList.toggle('zoom-active');
-    });
-
-  } else if (type === 'audio') {
-    el = document.createElement('audio');
-    el.src = src;
-    el.controls = true;
-
-  } else if (type === 'video') {
-    el = document.createElement('video');
-    el.src = src;
-    el.controls = true;
-    el.className = 'modal-media-video';
-  }
-
-  cont.appendChild(el);
-  cont.classList.remove('hidden');
-}
-
 
   generateTeamButtons() {
     const container = document.getElementById('team-buttons');
@@ -485,41 +486,37 @@ class JeopardyGame {
   }
 
   scoreTeam(teamIndex, isCorrect) {
-    // 1. Comprobación de seguridad
-    if (!this.currentQuestion || !this.currentQuestion.data) {
-        return; 
-    }
-    
-    // 2. Garantizar que los puntos son un número válido
-    const rawPoints = this.currentQuestion.data.points;
-    const points = parseInt(rawPoints, 10);
-    
-    if (isNaN(points)) {
-        return; 
-    }
-
-    // 3. Asignar puntaje
+    const points = this.currentQuestion.data.points;
     if (isCorrect) this.teams[teamIndex].score += points;
     else this.teams[teamIndex].score -= points;
 
-    // 4. Actualizar el marcador
     document.getElementById(`score-${teamIndex}`).textContent = this.teams[teamIndex].score;
-
-    // 5. FIX CRÍTICO: CERRAR AUTOMÁTICAMENTE LA PREGUNTA
-    // Esto previene los clics duplicados, cierra la modal y marca la celda como respondida.
-    this.closeModal(); 
+    // cerrar la pregunta (closeModal limpiará timer)
+    this.closeModal();
   }
 
   showAnswer() {
+    // Detenemos el timer cuando mostramos la respuesta
+    this.clearTimer();
+
     document.getElementById('answer-section').classList.remove('hidden');
     document.getElementById('show-answer').style.display = 'none';
   }
 
   closeModal() {
+    // Limpiar timer siempre que se cierre
+    this.clearTimer();
+
+    if (!this.currentQuestion) {
+      document.getElementById('question-modal').style.display = 'none';
+      return;
+    }
+
     const { categoryIndex, questionIndex } = this.currentQuestion;
     this.answeredQuestions.add(`${categoryIndex}-${questionIndex}`);
 
-    document.querySelector(`.question-cell[data-category="${categoryIndex}"][data-question="${questionIndex}"]`).classList.add('answered');
+    const cell = document.querySelector(`.question-cell[data-category="${categoryIndex}"][data-question="${questionIndex}"]`);
+    if (cell) cell.classList.add('answered');
 
     document.getElementById('question-modal').style.display = 'none';
     this.currentQuestion = null;
@@ -536,6 +533,91 @@ class JeopardyGame {
     let winner = this.teams.reduce((max, t) => t.score > max.score ? t : max, this.teams[0]);
     alert(`🏆 Ganador: ${winner.name}\nPuntaje: ${winner.score}`);
   }
+
+  /* ======= TIMER METHODS ======= */
+
+  startTimer() {
+    // Evitar duplicados
+    this.clearTimer();
+
+    // Default 10 segundos
+    this.timeLeft = 10;
+
+    // Crear/insertar visual del timer en el header
+    const header = document.querySelector('.modal-header');
+    if (!header) return;
+    // eliminar si existe
+    const existing = document.getElementById('question-timer');
+    if (existing) existing.remove();
+
+    const timerDisplay = document.createElement('div');
+    timerDisplay.id = 'question-timer';
+    timerDisplay.textContent = `⏱️ ${this.timeLeft}`;
+    timerDisplay.style.fontSize = '1.6rem';
+    timerDisplay.style.fontWeight = '700';
+    timerDisplay.style.marginLeft = '12px';
+    timerDisplay.style.color = '#00ff88';
+    timerDisplay.style.textShadow = '0 0 6px rgba(0,255,136,0.12)';
+    header.appendChild(timerDisplay);
+
+    // Intervalo
+    this.timerInterval = setInterval(() => {
+      this.timeLeft--;
+      this.updateTimerDisplay();
+      if (this.timeLeft <= 0) {
+        this.clearTimer();
+        const td = document.getElementById('question-timer');
+        if (td) {
+          td.textContent = "¡Tiempo!";
+          td.style.color = '#ff5555';
+        }
+        this.playBuzz();
+        this.flashScreen();
+      }
+    }, 1000);
+  }
+
+  updateTimerDisplay() {
+    const td = document.getElementById('question-timer');
+    if (!td) return;
+    td.textContent = `⏱️ ${this.timeLeft}`;
+    if (this.timeLeft > 6) {
+      td.style.color = '#00ff88'; // verde
+    } else if (this.timeLeft > 3) {
+      td.style.color = '#ffd700'; // amarillo
+    } else {
+      td.style.color = '#ff5555'; // rojo
+    }
+  }
+
+  clearTimer() {
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+      this.timerInterval = null;
+    }
+    const td = document.getElementById('question-timer');
+    if (td) td.remove();
+  }
+
+  flashScreen() {
+    // efecto flash simple en body
+    document.body.classList.add('flash');
+    setTimeout(() => document.body.classList.remove('flash'), 400);
+  }
+
+  playBuzz() {
+    try {
+      const buzz = new Audio();
+    buzz.src = "/buzz.mp3";
+    buzz.volume = 1.0;
+
+      buzz.play();
+    } catch (e) {
+      // si no se puede reproducir audio, ignorar
+      console.warn('No se pudo reproducir sonido:', e);
+    }
+  }
+
 }
 
 document.addEventListener('DOMContentLoaded', () => new JeopardyGame());
