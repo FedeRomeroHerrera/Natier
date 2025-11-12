@@ -608,7 +608,7 @@ class JeopardyGame {
   playBuzz() {
     try {
       const buzz = new Audio();
-    buzz.src = "/buzz.mp3";
+    buzz.src = "buzz.mp3";
     buzz.volume = 1.0;
 
       buzz.play();
