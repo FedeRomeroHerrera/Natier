@@ -540,8 +540,8 @@ class JeopardyGame {
     // Evitar duplicados
     this.clearTimer();
 
-    // Default 10 segundos
-    this.timeLeft = 10;
+    // Default 15 segundos
+    this.timeLeft = 15;
 
     // Crear/insertar visual del timer en el header
     const header = document.querySelector('.modal-header');
