@@ -86,7 +86,6 @@ class JeopardyGame {
     const tabsContainer = document.getElementById('category-tabs');
     container.innerHTML = '';
     tabsContainer.innerHTML = '';
-
     const isInitialLoad = Object.keys(this.questions).length === 0;
 
     for (let c = 0; c < this.categoriesCount; c++) {
@@ -114,26 +113,26 @@ class JeopardyGame {
       addBtn.textContent = "+ Agregar Pregunta";
       addBtn.className = "btn-secondary";
       addBtn.style.marginTop = "10px";
-      addBtn.addEventListener('click', () => {
+      addBtn.onclick = () => {
         const newIndex = catDiv.querySelectorAll('.question-item').length;
         this.addQuestionItem(catDiv, c, newIndex);
-      });
+      };
       catDiv.appendChild(addBtn);
       container.appendChild(catDiv);
 
-      tab.addEventListener('click', () => {
+      tab.onclick = () => {
         document.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.category-questions').forEach(q => q.classList.remove('active'));
         tab.classList.add('active');
         catDiv.classList.add('active');
-      });
+      };
     }
   }
 
   addQuestionItem(container, category, index, questionData = {}) {
     const qText = questionData.question || '';
     const aText = questionData.answer || '';
-    const points = questionData.points || (index + 1) * 100;
+    const points = (index + 1) * 100; // Puntos automáticos al crear
     const hasQMedia = questionData.qMediaSrc ? ' (Media cargada)' : '';
     const hasAMedia = questionData.aMediaSrc ? ' (Media cargada)' : '';
 
@@ -160,12 +159,12 @@ class JeopardyGame {
     const addButton = container.querySelector("button.btn-secondary");
     container.insertBefore(item, addButton);
 
-    item.querySelector('.delete-question').addEventListener('click', () => {
-      if(confirm('¿Eliminar esta pregunta?')) {
+    item.querySelector('.delete-question').onclick = () => {
+      if(confirm('¿Eliminar esta pregunta? Los puntos de las siguientes se reajustarán.')) {
         item.remove();
         this.reindexQuestions(container, category);
       }
-    });
+    };
 
     item.querySelectorAll('.file-input').forEach(input =>
       input.addEventListener('change', (e) => this.handleFileUpload(e))
@@ -175,14 +174,9 @@ class JeopardyGame {
   reindexQuestions(container, categoryIndex) {
     const items = container.querySelectorAll('.question-item');
     items.forEach((item, newIdx) => {
-      // 1. Actualizar el valor de los puntos automáticamente (100, 200, 300...)
       const pointsInput = item.querySelector('.points-input');
-      const newPoints = (newIdx + 1) * 100;
-      if (pointsInput) {
-        pointsInput.value = newPoints;
-      }
+      if (pointsInput) pointsInput.value = (newIdx + 1) * 100;
 
-      // 2. Actualizar todos los data-attributes para que el motor del juego sepa el nuevo orden
       item.querySelectorAll('input, textarea').forEach(el => {
         if (el.dataset.question) el.dataset.question = String(newIdx);
       });
@@ -232,6 +226,7 @@ class JeopardyGame {
     for (let c = 0; c < this.categoriesCount; c++) {
       data.questions[c] = {};
       const catDiv = document.querySelectorAll('.category-questions')[c];
+      if(!catDiv) continue;
       const qItems = catDiv.querySelectorAll('.question-item');
       qItems.forEach((item, qIdx) => {
         const qText = item.querySelector('.question-input').value.trim();
@@ -292,12 +287,7 @@ class JeopardyGame {
     this.teams = setupData.teams;
     this.categories = setupData.categories;
     this.questions = setupData.questions;
-
-    if (this.teams.length === 0) {
-      alert('❌ Agregá equipos.');
-      return;
-    }
-
+    if (this.teams.length === 0) { alert('❌ Agregá equipos.'); return; }
     document.getElementById('setup-screen').classList.remove('active');
     document.getElementById('game-screen').classList.add('active');
     this.generateGameInterface();
@@ -317,7 +307,6 @@ class JeopardyGame {
     const questionsGrid = document.getElementById('questions-grid');
     categoriesHeader.innerHTML = '';
     questionsGrid.innerHTML = '';
-
     categoriesHeader.style.gridTemplateColumns = `repeat(${this.categoriesCount}, 1fr)`;
     questionsGrid.style.gridTemplateColumns = `repeat(${this.categoriesCount}, 1fr)`;
 
@@ -337,7 +326,7 @@ class JeopardyGame {
         const entry = this.questions[col]?.[row];
         if (entry) {
           cell.textContent = `$${entry.points}`;
-          cell.addEventListener('click', () => this.showQuestion(col, row));
+          cell.onclick = () => this.showQuestion(col, row);
         } else {
           cell.style.visibility = "hidden";
         }
@@ -412,8 +401,8 @@ class JeopardyGame {
     if (this.currentQuestion) {
       const { categoryIndex, questionIndex } = this.currentQuestion;
       this.answeredQuestions.add(`${categoryIndex}-${questionIndex}`);
-      // Marcar como respondida visualmente usando el orden en el grid
       const cells = document.querySelectorAll('.question-cell');
+      // Buscar celda correcta por posición
       const targetIdx = (questionIndex * this.categoriesCount) + categoryIndex;
       if (cells[targetIdx]) cells[targetIdx].classList.add('answered');
     }
@@ -429,17 +418,31 @@ class JeopardyGame {
     if (!td) {
       td = document.createElement('div');
       td.id = 'question-timer';
+      td.style.fontSize = '2rem';
+      td.style.color = '#ff5555';
       header.appendChild(td);
     }
+    td.textContent = `⏱️ ${this.timeLeft}`;
+
     this.timerInterval = setInterval(() => {
       this.timeLeft--;
       td.textContent = `⏱️ ${this.timeLeft}`;
+      
       if (this.timeLeft <= 0) {
-        clearInterval(this.timerInterval);
+        this.clearTimer();
+        this.playBuzz();
         document.body.classList.add('flash');
         setTimeout(() => document.body.classList.remove('flash'), 400);
       }
     }, 1000);
+  }
+
+  playBuzz() {
+    try {
+      const buzz = new Audio("buzz.mp3");
+      buzz.volume = 1.0;
+      buzz.play();
+    } catch (e) { console.warn('Error audio:', e); }
   }
 
   clearTimer() {
