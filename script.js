@@ -6,11 +6,8 @@ class JeopardyGame {
     this.questions = {};
     this.answeredQuestions = new Set();
     this.currentQuestion = null;
-
-    // Timer
     this.timerInterval = null;
     this.timeLeft = 0;
-
     this.init();
   }
 
@@ -38,7 +35,6 @@ class JeopardyGame {
 
     document.getElementById('export-json').addEventListener('click', () => this.exportJSON());
     document.getElementById('import-json').addEventListener('change', (e) => this.importJSON(e));
-
     document.getElementById('start-game').addEventListener('click', () => this.startGame());
 
     const modal = document.getElementById('question-modal');
@@ -78,7 +74,6 @@ class JeopardyGame {
     const categoryInputs = document.querySelectorAll('.category-input');
     const tabs = document.querySelectorAll('.category-tab');
     const titles = document.querySelectorAll('.category-questions h3');
-
     categoryInputs.forEach((input, idx) => {
       const name = input.value.trim() || `Categoría ${idx + 1}`;
       if (tabs[idx]) tabs[idx].textContent = name;
@@ -92,7 +87,6 @@ class JeopardyGame {
     container.innerHTML = '';
     tabsContainer.innerHTML = '';
 
-    // Determina si estamos en la carga inicial (cuando this.questions está completamente vacío)
     const isInitialLoad = Object.keys(this.questions).length === 0;
 
     for (let c = 0; c < this.categoriesCount; c++) {
@@ -108,16 +102,10 @@ class JeopardyGame {
       catDiv.innerHTML = `<h3>Categoría ${c + 1}</h3>`;
 
       if (!this.questions[c]) this.questions[c] = {};
-      
-      // Se mantiene la lógica de conteo dinámico para las preguntas
       let existingCount = Object.keys(this.questions[c]).length;
-      
-      if (isInitialLoad && existingCount === 0) {
-        existingCount = 5;
-      }
+      if (isInitialLoad && existingCount === 0) existingCount = 5;
       
       for (let qIdx = 0; qIdx < existingCount; qIdx++) {
-        // Obtener la data de la pregunta y pasarla
         const questionData = this.questions[c][qIdx] || {};
         this.addQuestionItem(catDiv, c, qIdx, questionData);
       }
@@ -131,7 +119,6 @@ class JeopardyGame {
         this.addQuestionItem(catDiv, c, newIndex);
       });
       catDiv.appendChild(addBtn);
-
       container.appendChild(catDiv);
 
       tab.addEventListener('click', () => {
@@ -153,22 +140,19 @@ class JeopardyGame {
     const item = document.createElement('div');
     item.className = 'question-item';
     item.innerHTML = `
+      <button class="delete-question" title="Eliminar pregunta">×</button>
       <div class="question-header">
         <label>Puntos:</label>
         <input type="number" value="${points}" class="points-input" data-category="${category}" data-question="${index}">
       </div>
-
       <textarea placeholder="Pregunta..." class="question-input" data-category="${category}" data-question="${index}">${qText}</textarea>
-
       <label class="file-input-label">
-        📎 Agregar imagen/audio/video a la pregunta${hasQMedia}
+        📎 Agregar multimedia a pregunta${hasQMedia}
         <input type="file" accept="image/*,audio/*,video/*" class="file-input question-media" data-category="${category}" data-question="${index}">
       </label>
-
       <textarea placeholder="Respuesta..." class="answer-input" data-category="${category}" data-question="${index}">${aText}</textarea>
-
       <label class="file-input-label">
-        📎 Agregar imagen/audio/video a la respuesta${hasAMedia}
+        📎 Agregar multimedia a respuesta${hasAMedia}
         <input type="file" accept="image/*,audio/*,video/*" class="file-input answer-media" data-category="${category}" data-question="${index}">
       </label>
     `;
@@ -176,41 +160,61 @@ class JeopardyGame {
     const addButton = container.querySelector("button.btn-secondary");
     container.insertBefore(item, addButton);
 
+    item.querySelector('.delete-question').addEventListener('click', () => {
+      if(confirm('¿Eliminar esta pregunta?')) {
+        item.remove();
+        this.reindexQuestions(container, category);
+      }
+    });
+
     item.querySelectorAll('.file-input').forEach(input =>
       input.addEventListener('change', (e) => this.handleFileUpload(e))
     );
   }
 
+  reindexQuestions(container, categoryIndex) {
+    const items = container.querySelectorAll('.question-item');
+    items.forEach((item, newIdx) => {
+      // 1. Actualizar el valor de los puntos automáticamente (100, 200, 300...)
+      const pointsInput = item.querySelector('.points-input');
+      const newPoints = (newIdx + 1) * 100;
+      if (pointsInput) {
+        pointsInput.value = newPoints;
+      }
+
+      // 2. Actualizar todos los data-attributes para que el motor del juego sepa el nuevo orden
+      item.querySelectorAll('input, textarea').forEach(el => {
+        if (el.dataset.question) el.dataset.question = String(newIdx);
+      });
+      item.querySelectorAll('.file-input').forEach(el => {
+        el.dataset.question = String(newIdx);
+      });
+    });
+  }
+
   handleFileUpload(event) {
     const file = event.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (e) => {
       const dataURL = e.target.result;
       const category = event.target.dataset.category;
       const question = event.target.dataset.question;
       const isQuestionSide = event.target.classList.contains('question-media');
-
       if (!this.questions[category]) this.questions[category] = {};
       if (!this.questions[category][question]) this.questions[category][question] = {};
 
-      const type = file.type.startsWith('image/') ? 'image'
-            : file.type.startsWith('audio/') ? 'audio'
-            : file.type.startsWith('video/') ? 'video'
-            : 'unknown';
+      const type = file.type.startsWith('image/') ? 'image' : file.type.startsWith('audio/') ? 'audio' : file.type.startsWith('video/') ? 'video' : 'unknown';
 
       if (isQuestionSide) {
         this.questions[category][question].qMediaType = type;
         this.questions[category][question].qMediaSrc = dataURL;
-        const label = event.target.closest('label');
-        if (label) label.innerHTML = `📎 Agregar imagen/audio/video a la pregunta (Media cargada)<input type="file" accept="image/*,audio/*,video/*" class="file-input question-media" data-category="${category}" data-question="${question}">`;
       } else {
         this.questions[category][question].aMediaType = type;
         this.questions[category][question].aMediaSrc = dataURL;
-        const label = event.target.closest('label');
-        if (label) label.innerHTML = `📎 Agregar imagen/audio/video a la respuesta (Media cargada)<input type="file" accept="image/*,audio/*,video/*" class="file-input answer-media" data-category="${category}" data-question="${question}">`;
       }
+      const label = event.target.closest('label');
+      if (label) label.childNodes[0].textContent = `📎 Media cargada `;
     };
     reader.readAsDataURL(file);
   }
@@ -220,62 +224,46 @@ class JeopardyGame {
     document.querySelectorAll('.team-name-input').forEach((input, idx) => {
       teams.push({ name: input.value.trim() || `Equipo ${idx + 1}`, score: 0 });
     });
-
     const categories = [];
     document.querySelectorAll('.category-input').forEach((input, idx) => {
       categories.push(input.value.trim() || `Categoría ${idx + 1}`);
     });
-
     const data = { categoriesCount: this.categoriesCount, teams, categories, questions: {} };
-
     for (let c = 0; c < this.categoriesCount; c++) {
       data.questions[c] = {};
-      const questionCount = document.querySelectorAll(`.question-input[data-category="${c}"]`).length;
-
-      for (let q = 0; q < questionCount; q++) {
-        const qEl = document.querySelector(`.question-input[data-category="${c}"][data-question="${q}"]`);
-        const aEl = document.querySelector(`.answer-input[data-category="${c}"][data-question="${q}"]`);
-        const pEl = document.querySelector(`.points-input[data-category="${c}"][data-question="${q}"]`);
-
-        const base = this.questions?.[c]?.[q] || {};
-        data.questions[c][q] = {
-          question: (qEl?.value || '').trim() || 'Pregunta no definida',
-          answer: (aEl?.value || '').trim() || 'Respuesta no definida',
-          points: parseInt(pEl?.value || '100', 10),
+      const catDiv = document.querySelectorAll('.category-questions')[c];
+      const qItems = catDiv.querySelectorAll('.question-item');
+      qItems.forEach((item, qIdx) => {
+        const qText = item.querySelector('.question-input').value.trim();
+        const aText = item.querySelector('.answer-input').value.trim();
+        const pts = parseInt(item.querySelector('.points-input').value, 10);
+        const base = this.questions?.[c]?.[qIdx] || {};
+        data.questions[c][qIdx] = {
+          question: qText || 'Pregunta no definida',
+          answer: aText || 'Respuesta no definida',
+          points: pts,
           qMediaType: base.qMediaType || null,
           qMediaSrc: base.qMediaSrc || null,
           aMediaType: base.aMediaType || null,
           aMediaSrc: base.aMediaSrc || null
         };
-      }
+      });
     }
-
     return data;
   }
 
   applySetupObject(data) {
-    // 1. Equipos (MODIFICADO)
-    document.getElementById('team-count').value = String(data.teams.length); // Actualiza el select de cantidad
-    this.updateTeamInputs(data.teams.length); // Crea los inputs vacíos
-
+    document.getElementById('team-count').value = String(data.teams.length);
+    this.updateTeamInputs(data.teams.length);
     const teamInputs = document.querySelectorAll('.team-name-input');
-    data.teams.forEach((t, i) => {
-      if(teamInputs[i]) teamInputs[i].value = t.name;
-    });
-
-    // 2. Categorías y Preguntas
+    data.teams.forEach((t, i) => { if(teamInputs[i]) teamInputs[i].value = t.name; });
     this.categoriesCount = data.categoriesCount;
     document.getElementById('categories-count').value = String(this.categoriesCount);
     this.updateCategoriesInputs(this.categoriesCount);
-    
-    // El orden importa: this.questions debe llenarse ANTES de llamar a generateQuestionsSetup()
     this.questions = data.questions || {}; 
     this.generateQuestionsSetup();
-
     const catInputs = document.querySelectorAll('.category-input');
-    data.categories.forEach((cname, i) => {
-      if(catInputs[i]) catInputs[i].value = cname;
-    });
+    data.categories.forEach((cname, i) => { if(catInputs[i]) catInputs[i].value = cname; });
     this.updateCategoryNames();
   }
 
@@ -285,9 +273,7 @@ class JeopardyGame {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'jeopardy_setup.json';
-    document.body.appendChild(a);
     a.click();
-    a.remove();
   }
 
   importJSON(e) {
@@ -295,64 +281,26 @@ class JeopardyGame {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      try {
-        this.applySetupObject(JSON.parse(ev.target.result));
-        alert('✅ Juego importado correctamente.');
-      } catch {
-        alert('❌ Archivo inválido.');
-      }
+      try { this.applySetupObject(JSON.parse(ev.target.result)); } 
+      catch { alert('❌ Archivo inválido.'); }
     };
     reader.readAsText(file);
   }
 
   startGame() {
-    this.teams = [];
-    document.querySelectorAll('.team-name-input').forEach((input, idx) => {
-      const name = input.value.trim();
-      if (name) {
-          this.teams.push({ name: name, score: 0 });
-      }
-    });
-    
-    // FIX: Verificar que hay equipos para jugar
+    const setupData = this.buildSetupObject();
+    this.teams = setupData.teams;
+    this.categories = setupData.categories;
+    this.questions = setupData.questions;
+
     if (this.teams.length === 0) {
-        alert('❌ Debes definir al menos un equipo para empezar el juego.');
-        return;
+      alert('❌ Agregá equipos.');
+      return;
     }
-
-    this.categories = [];
-    document.querySelectorAll('.category-input').forEach((input, idx) => {
-      this.categories.push(input.value.trim() || `Categoría ${idx + 1}`);
-    });
-
-    this.collectQuestions();
 
     document.getElementById('setup-screen').classList.remove('active');
     document.getElementById('game-screen').classList.add('active');
-
     this.generateGameInterface();
-  }
-
-  collectQuestions() {
-    for (let c = 0; c < this.categoriesCount; c++) {
-      const questionCount = document.querySelectorAll(`.question-input[data-category="${c}"]`).length;
-      for (let q = 0; q < questionCount; q++) {
-        const qEl = document.querySelector(`.question-input[data-category="${c}"][data-question="${q}"]`);
-        const aEl = document.querySelector(`.answer-input[data-category="${c}"][data-question="${q}"]`);
-        const pEl = document.querySelector(`.points-input[data-category="${c}"][data-question="${q}"]`);
-
-        const prev = this.questions[c]?.[q] || {};
-        this.questions[c][q] = {
-          question: (qEl?.value || '').trim(),
-          answer: (aEl?.value || '').trim(),
-          points: parseInt(pEl?.value || '100'),
-          qMediaType: prev.qMediaType || null,
-          qMediaSrc: prev.qMediaSrc || null,
-          aMediaType: prev.aMediaType || null,
-          aMediaSrc: prev.aMediaSrc || null
-        };
-      }
-    }
   }
 
   generateGameInterface() {
@@ -361,17 +309,12 @@ class JeopardyGame {
     this.teams.forEach((team, idx) => {
       const div = document.createElement('div');
       div.className = 'team-score';
-      div.innerHTML = `
-        <div class="team-name">${team.name}</div>
-        <div class="score" id="score-${idx}">${team.score}</div>
-      `;
+      div.innerHTML = `<div class="team-name">${team.name}</div><div class="score" id="score-${idx}">${team.score}</div>`;
       scoreboard.appendChild(div);
     });
 
     const categoriesHeader = document.getElementById('categories-header');
     const questionsGrid = document.getElementById('questions-grid');
-    const board = document.getElementById('game-board');
-
     categoriesHeader.innerHTML = '';
     questionsGrid.innerHTML = '';
 
@@ -385,23 +328,19 @@ class JeopardyGame {
       categoriesHeader.appendChild(el);
     });
 
-    const maxRows = Math.max(5, ...Object.values(this.questions).map(cat => Object.keys(cat).length));
+    const maxQuestions = Math.max(...Object.values(this.questions).map(c => Object.keys(c).length));
 
-    for (let row = 0; row < maxRows; row++) {
+    for (let row = 0; row < maxQuestions; row++) {
       for (let col = 0; col < this.categoriesCount; col++) {
         const cell = document.createElement('div');
-        const entry = this.questions[col]?.[row];
         cell.className = 'question-cell';
-
+        const entry = this.questions[col]?.[row];
         if (entry) {
           cell.textContent = `$${entry.points}`;
-          cell.dataset.category = col;
-          cell.dataset.question = row;
           cell.addEventListener('click', () => this.showQuestion(col, row));
         } else {
           cell.style.visibility = "hidden";
         }
-
         questionsGrid.appendChild(cell);
       }
     }
@@ -410,58 +349,33 @@ class JeopardyGame {
   showQuestion(categoryIndex, questionIndex) {
     const data = this.questions[categoryIndex][questionIndex];
     this.currentQuestion = { categoryIndex, questionIndex, data };
-
     document.getElementById('modal-category').textContent = this.categories[categoryIndex];
-    document.getElementById('modal-points').textContent = `${data.points}`;
+    document.getElementById('modal-points').textContent = `$${data.points}`;
     document.getElementById('question-text').textContent = data.question;
-
     this.renderModalMedia('question-media-container', data.qMediaType, data.qMediaSrc);
     document.getElementById('answer-text').textContent = data.answer;
     this.renderModalMedia('answer-media-container', data.aMediaType, data.aMediaSrc);
-
     document.getElementById('answer-section').classList.add('hidden');
     document.getElementById('show-answer').style.display = 'inline-block';
-
     this.generateTeamButtons();
     document.getElementById('question-modal').style.display = 'block';
-
-    // Iniciar timer cuando se abre la pregunta
     this.startTimer();
   }
 
   renderModalMedia(containerId, type, src) {
     const cont = document.getElementById(containerId);
     cont.innerHTML = '';
-
-    if (!type || !src) {
-      cont.classList.add('hidden');
-      return;
-    }
-
+    if (!type || !src) { cont.classList.add('hidden'); return; }
     let el;
     if (type === 'image') {
       el = document.createElement('img');
-      el.src = src;
-      el.className = 'modal-media';
-
-      // Zoom toggle estable
-      el.addEventListener('click', () => {
-        el.classList.toggle('zoomed');
-        document.body.classList.toggle('zoom-active');
-      });
-
+      el.src = src; el.className = 'modal-media';
+      el.onclick = () => { el.classList.toggle('zoomed'); document.body.classList.toggle('zoom-active'); };
     } else if (type === 'audio') {
-      el = document.createElement('audio');
-      el.src = src;
-      el.controls = true;
-
+      el = document.createElement('audio'); el.src = src; el.controls = true;
     } else if (type === 'video') {
-      el = document.createElement('video');
-      el.src = src;
-      el.controls = true;
-      el.className = 'modal-media-video';
+      el = document.createElement('video'); el.src = src; el.controls = true; el.className = 'modal-media-video';
     }
-
     cont.appendChild(el);
     cont.classList.remove('hidden');
   }
@@ -471,153 +385,68 @@ class JeopardyGame {
     container.innerHTML = '';
     this.teams.forEach((team, idx) => {
       const ok = document.createElement('button');
-      ok.className = 'team-button correct';
-      ok.textContent = `✓ ${team.name}`;
-      ok.addEventListener('click', () => this.scoreTeam(idx, true));
-
+      ok.className = 'team-button correct'; ok.textContent = `✓ ${team.name}`;
+      ok.onclick = () => this.scoreTeam(idx, true);
       const bad = document.createElement('button');
-      bad.className = 'team-button incorrect';
-      bad.textContent = `✗ ${team.name}`;
-      bad.addEventListener('click', () => this.scoreTeam(idx, false));
-
-      container.appendChild(ok);
-      container.appendChild(bad);
+      bad.className = 'team-button incorrect'; bad.textContent = `✗ ${team.name}`;
+      bad.onclick = () => this.scoreTeam(idx, false);
+      container.appendChild(ok); container.appendChild(bad);
     });
   }
 
   scoreTeam(teamIndex, isCorrect) {
-    const points = this.currentQuestion.data.points;
-    if (isCorrect) this.teams[teamIndex].score += points;
-    else this.teams[teamIndex].score -= points;
-
+    const pts = this.currentQuestion.data.points;
+    this.teams[teamIndex].score += isCorrect ? pts : -pts;
     document.getElementById(`score-${teamIndex}`).textContent = this.teams[teamIndex].score;
-    // cerrar la pregunta (closeModal limpiará timer)
     this.closeModal();
   }
 
   showAnswer() {
-    // Detenemos el timer cuando mostramos la respuesta
     this.clearTimer();
-
     document.getElementById('answer-section').classList.remove('hidden');
     document.getElementById('show-answer').style.display = 'none';
   }
 
   closeModal() {
-    // Limpiar timer siempre que se cierre
     this.clearTimer();
-
-    if (!this.currentQuestion) {
-      document.getElementById('question-modal').style.display = 'none';
-      return;
+    if (this.currentQuestion) {
+      const { categoryIndex, questionIndex } = this.currentQuestion;
+      this.answeredQuestions.add(`${categoryIndex}-${questionIndex}`);
+      // Marcar como respondida visualmente usando el orden en el grid
+      const cells = document.querySelectorAll('.question-cell');
+      const targetIdx = (questionIndex * this.categoriesCount) + categoryIndex;
+      if (cells[targetIdx]) cells[targetIdx].classList.add('answered');
     }
-
-    const { categoryIndex, questionIndex } = this.currentQuestion;
-    this.answeredQuestions.add(`${categoryIndex}-${questionIndex}`);
-
-    const cell = document.querySelector(`.question-cell[data-category="${categoryIndex}"][data-question="${questionIndex}"]`);
-    if (cell) cell.classList.add('answered');
-
     document.getElementById('question-modal').style.display = 'none';
     this.currentQuestion = null;
-
-    this.checkGameEnd();
   }
-
-  checkGameEnd() {
-    const total = Object.values(this.questions).reduce((sum, cat) => sum + Object.keys(cat).length, 0);
-    if (this.answeredQuestions.size >= total) this.showGameEnd();
-  }
-
-  showGameEnd() {
-    let winner = this.teams.reduce((max, t) => t.score > max.score ? t : max, this.teams[0]);
-    alert(`🏆 Ganador: ${winner.name}\nPuntaje: ${winner.score}`);
-  }
-
-  /* ======= TIMER METHODS ======= */
 
   startTimer() {
-    // Evitar duplicados
     this.clearTimer();
-
-    // Default 15 segundos
-    this.timeLeft = 15;
-
-    // Crear/insertar visual del timer en el header
+    this.timeLeft = 30;
     const header = document.querySelector('.modal-header');
-    if (!header) return;
-    // eliminar si existe
-    const existing = document.getElementById('question-timer');
-    if (existing) existing.remove();
-
-    const timerDisplay = document.createElement('div');
-    timerDisplay.id = 'question-timer';
-    timerDisplay.textContent = `⏱️ ${this.timeLeft}`;
-    timerDisplay.style.fontSize = '1.6rem';
-    timerDisplay.style.fontWeight = '700';
-    timerDisplay.style.marginLeft = '12px';
-    timerDisplay.style.color = '#00ff88';
-    timerDisplay.style.textShadow = '0 0 6px rgba(0,255,136,0.12)';
-    header.appendChild(timerDisplay);
-
-    // Intervalo
+    let td = document.getElementById('question-timer');
+    if (!td) {
+      td = document.createElement('div');
+      td.id = 'question-timer';
+      header.appendChild(td);
+    }
     this.timerInterval = setInterval(() => {
       this.timeLeft--;
-      this.updateTimerDisplay();
+      td.textContent = `⏱️ ${this.timeLeft}`;
       if (this.timeLeft <= 0) {
-        this.clearTimer();
-        const td = document.getElementById('question-timer');
-        if (td) {
-          td.textContent = "¡Tiempo!";
-          td.style.color = '#ff5555';
-        }
-        this.playBuzz();
-        this.flashScreen();
+        clearInterval(this.timerInterval);
+        document.body.classList.add('flash');
+        setTimeout(() => document.body.classList.remove('flash'), 400);
       }
     }, 1000);
   }
 
-  updateTimerDisplay() {
-    const td = document.getElementById('question-timer');
-    if (!td) return;
-    td.textContent = `⏱️ ${this.timeLeft}`;
-    if (this.timeLeft > 6) {
-      td.style.color = '#00ff88'; // verde
-    } else if (this.timeLeft > 3) {
-      td.style.color = '#ffd700'; // amarillo
-    } else {
-      td.style.color = '#ff5555'; // rojo
-    }
-  }
-
   clearTimer() {
-    if (this.timerInterval) {
-      clearInterval(this.timerInterval);
-      this.timerInterval = null;
-    }
+    if (this.timerInterval) clearInterval(this.timerInterval);
     const td = document.getElementById('question-timer');
     if (td) td.remove();
   }
-
-  flashScreen() {
-    // efecto flash simple en body
-    document.body.classList.add('flash');
-    setTimeout(() => document.body.classList.remove('flash'), 400);
-  }
-
-  playBuzz() {
-    try {
-      const buzz = new Audio();
-    buzz.src = "buzz.mp3";
-    buzz.volume = 1.0;
-
-      buzz.play();
-    } catch (e) {
-      // si no se puede reproducir audio, ignorar
-      console.warn('No se pudo reproducir sonido:', e);
-    }
-  }
-
 }
 
 document.addEventListener('DOMContentLoaded', () => new JeopardyGame());
